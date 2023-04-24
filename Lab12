@@ -1,0 +1,140 @@
+import pandas as pd
+import numpy as np
+import matplotlib.pyplot as plt
+import scipy.fftpack as sigf
+import scipy.signal as sig
+import control as con
+
+# load input signal
+df = pd.read_csv('NoisySignal.csv')
+
+t = df['0']. values
+sensor_sig = df['1']. values
+
+plt.figure(figsize = (10, 7))
+plt.plot(t, sensor_sig)
+plt.grid()
+plt.title('Noisy Input Signal ')
+plt.xlabel('Time [s]')
+plt.ylabel('Amplitude [V]')
+plt.show()
+
+def make_stem(ax ,x,y,color='k',style='solid',label='',linewidths =2.5 ,** kwargs):
+    ax.axhline(x[0],x[-1],0, color='r')
+    ax.vlines(x, 0 ,y, color=color , linestyles=style , label=label , linewidths=linewidths)
+    ax.set_ylim([1.05*y.min(), 1.05*y.max()])
+
+def fft(x,fs):
+    N = len(x) # find the length of the signal
+    X_fft = sigf.fft(x) # perform the fast Fourier transform (fft)
+    X_fft_shifted = sigf.fftshift(X_fft) # shift zero frequency components
+                                        # to the center of the spectrum
+    freq = np.arange(-N/2, N/2)*fs/N # compute the frequencies for the output
+                                     # signal , (fs is the sampling frequency and
+                                     # needs to be defined previously in your code
+    X_mag = np.abs(X_fft_shifted)/N # compute the magnitudes of the signal
+    X_phi = np.angle(X_fft_shifted) # compute the phases of the signal
+    for i in range(N):
+        if X_mag[i] < 1e-10:
+            X_phi[i] = 0
+    return freq, X_mag, X_phi
+
+[freq, X_mag, X_phi] = fft(sensor_sig,1e6) #creating array's for frequency, mag, and angle
+    
+# Task 1
+
+#The whole Fourier
+fig , ax  = plt.subplots( figsize =(10, 7))
+make_stem(ax , freq , X_mag)
+plt.xlim(0, 60000)
+plt.title('all the range')
+plt.ylabel('|H(jw)|')
+plt.xlabel('Hz')
+
+fig , ax1  = plt.subplots( figsize =(10, 7))
+make_stem(ax1 , freq , X_phi)
+plt.xlim(0, 60000)
+plt.title('all the range')
+plt.ylabel('/_H(jw)')
+plt.xlabel('Hz')
+plt.show()
+
+#Low
+fig , ax1  = plt.subplots( figsize =(10, 7))
+plt.xlim(0,1800)
+plt.title('Low Frequencies')
+plt.xlabel('Hz')
+make_stem(ax1 , freq , X_mag)
+plt.ylabel('|H(jw)|')
+
+fig , ax2  = plt.subplots( figsize =(10, 7))
+make_stem(ax2 , freq , X_phi)
+plt.xlim(0,1800)
+plt.title('Low Frequencies')
+plt.ylabel('/_H(jw)')
+plt.xlabel('Hz')
+plt.show()
+
+#Position signal
+fig , ax  = plt.subplots( figsize =(10, 7))
+make_stem(ax , freq , X_mag)
+plt.xlim(1800, 2000)
+plt.title('1.8-2kHz')
+plt.ylabel('|H(jw)|')
+plt.xlabel('Hz')
+
+fig , ax1  = plt.subplots( figsize =(10, 7))
+make_stem(ax1 , freq , X_phi)
+plt.xlim(1800, 2000)
+plt.title('1.8-2kHz')
+plt.ylabel('|_H(jw)')
+plt.xlabel('Hz')
+plt.show()
+
+
+#High 
+fig , ax1  = plt.subplots( figsize =(10, 7))
+plt.xlim(2000, 60000)
+plt.title('High Frequencies')
+plt.xlabel('Hz')
+make_stem(ax1 , freq , X_mag)
+plt.ylabel('|H(jw)|')
+
+fig , ax2  = plt.subplots( figsize =(10, 7))
+make_stem(ax2 , freq , X_phi)
+plt.xlim(2000, 60000)
+plt.title('High Frequencies')
+plt.ylabel('/_H(jw)')
+plt.xlabel('Hz')
+plt.show()
+
+
+#Task 2 & 3
+
+step = 100
+w = np.arange(100, 300000, step)
+
+R = 750
+L = 75e-3
+C = 0.1e-6
+
+num = [1/(R*C),0]
+den = [1,1/(R*C),1/(L*C)]
+
+sys = con.TransferFunction(num, den)
+print(sys)
+mag, phase, omega = con.bode(sys, w, Hz = True, dB = True, deg = False)
+
+#Task 4
+
+fs = 3e6
+numZ, denZ = sig.bilinear(num, den, fs)
+y = sig.lfilter(numZ,denZ,sensor_sig)
+
+plt.figure(figsize = (16, 12))
+plt.subplot(2, 1, 2)
+plt.plot(t, y)
+plt.grid()
+plt.xlabel('Time (seconds)')
+plt.ylabel('Amplitude (V)')
+plt.title("Output Signal")
